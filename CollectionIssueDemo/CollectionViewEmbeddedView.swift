@@ -33,27 +33,46 @@ class CollectionViewEmbeddedView: UIView, CollectionViewEmbeddedFooterViewDelega
         return collectionView
     }()
     
-    typealias DataSource = UICollectionViewDiffableDataSource<Section, Animal>
-    typealias Snapshot = NSDiffableDataSourceSnapshot<Section, Animal>
+//    typealias DataSource = UICollectionViewDiffableDataSource<Section, Animal>
+//    typealias Snapshot = NSDiffableDataSourceSnapshot<Section, Animal>
+    typealias DataSource = UICollectionViewDiffableDataSource<Section, Movie>
+    typealias Snapshot = NSDiffableDataSourceSnapshot<Section, Movie>
     private lazy var dataSource = makeDataSource()
     private var subscriptions: Set<AnyCancellable> = []
     weak var delegate: CollectionViewEmbeddedViewDelegate?
     @Published private(set) var height: CGFloat = 0
     
-    private var animals: [Animal] = [
-        Animal(name: "Dog", systemName: "dog.fill"),
-        Animal(name: "Cat", systemName: "cat.fill"),
-        Animal(name: "Hare", systemName: "hare.fill"),
-        Animal(name: "Lizard", systemName: "lizard.fill"),  // Based on data to determine collectionView size
-        Animal(name: "Bird", systemName: "bird.fill"),
-        Animal(name: "Fish", systemName: "fish.fill")
-    ]
+//    // Fix data seems to be okay using in the scenario
+//    private var animals: [Animal] = [
+//        Animal(name: "Dog", systemName: "dog.fill"),
+//        Animal(name: "Cat", systemName: "cat.fill"),
+//        Animal(name: "Hare", systemName: "hare.fill"),
+//        Animal(name: "Lizard", systemName: "lizard.fill"),  // Based on data to determine collectionView size
+//        Animal(name: "Bird", systemName: "bird.fill"),
+//        Animal(name: "Fish", systemName: "fish.fill")
+//    ]
+    private var movies: [Movie] = [] {
+        didSet {
+            updateSnapshot(animated: true)
+        }
+    }
+    let apiKey = "ab78eda72ff6817210f05012a437246c"
     
     override init(frame: CGRect) {
         super.init(frame: frame)
         
         setupUI()
-        updateSnapshot(animated: true)
+        
+        Task {
+            do {
+                let movies = try await fetchMoviesFromAPI()
+                self.movies = movies
+            } catch {
+                print(error)
+            }
+        }
+        
+//        updateSnapshot(animated: true)
         setupBindings()
     }
     
@@ -75,25 +94,44 @@ class CollectionViewEmbeddedView: UIView, CollectionViewEmbeddedFooterViewDelega
         ])
     }
     
+    private func fetchMoviesFromAPI() async throws -> [Movie] {
+        let url = URL(string: "https://api.themoviedb.org/3/movie/upcoming?api_key=\(apiKey)")!
+        
+        let (data, response) = try await URLSession.shared.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            return []
+        }
+        
+        do {
+            let decoded = try JSONDecoder().decode(MovieResponse.self, from: data)
+            return decoded.results
+        } catch {
+            return []
+        }
+    }
+    
     private func setupBindings() {
         collectionView.publisher(for: \.contentSize)
             .map(\.height)
             .removeDuplicates()
-            .print()
             .assign(to: \.height, on: self)
             .store(in: &subscriptions)
     }
     
     private func makeDataSource() -> DataSource {
-        let cellRegistration = UICollectionView.CellRegistration<UICollectionViewListCell, Animal> { cell, indexPath, animal in
+        let cellRegistration = UICollectionView.CellRegistration<UICollectionViewListCell, Movie> { cell, indexPath, movie in
             var content = cell.defaultContentConfiguration()
-            content.text = animal.name
-            content.image = UIImage(systemName: animal.systemName)
+            content.text = movie.title
+            content.secondaryText = movie.overview
+            content.secondaryTextProperties.numberOfLines = 3
+//            content.image = UIImage(systemName: animal.systemName)
             cell.contentConfiguration = content
         }
         
-        let dataSource = DataSource(collectionView: collectionView) { collectionView, indexPath, animal in
-            return collectionView.dequeueConfiguredReusableCell(using: cellRegistration, for: indexPath, item: animal)
+        let dataSource = DataSource(collectionView: collectionView) { collectionView, indexPath, movie in
+            return collectionView.dequeueConfiguredReusableCell(using: cellRegistration, for: indexPath, item: movie)
         }
         
         dataSource.supplementaryViewProvider = { collectionView, kind, indexPath in
@@ -111,7 +149,7 @@ class CollectionViewEmbeddedView: UIView, CollectionViewEmbeddedFooterViewDelega
         var snapshot = Snapshot()
         
         snapshot.appendSections([.main])
-        snapshot.appendItems(animals, toSection: .main)
+        snapshot.appendItems(movies, toSection: .main)
         
         dataSource.apply(snapshot, animatingDifferences: animated)
     }
@@ -156,6 +194,7 @@ class CollectionViewEmbeddedFooterView: UICollectionReusableView {
     }
     
     private func setupUI() {
+        backgroundColor = .white
         addSubview(actionButton)
         
         let kPadding: CGFloat = 10

@@ -44,10 +44,18 @@ class CollectionViewEmbeddedViewController: UIViewController, CollectionViewEmbe
     
     private func setupBindings() {
         embeddedView.$height
+            .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] height in
                 guard let self else { return }
-                updateHeightConstraint(height + 1)  // pretty strange here(need to add at least 1 to update the height)
+                let totalHeight = height + 1
+                let deviceScreenHeight = view.safeAreaLayoutGuide.layoutFrame.height
+                let maxAllowedHeight = deviceScreenHeight - 100
+                let adjustedHeight = min(totalHeight, maxAllowedHeight)
+//                updateHeightConstraint(adjustedHeight)  // pretty strange here(need to add at least 1 to update the height)
+                if embeddedViewHeightConstraint?.constant != adjustedHeight {
+                    updateHeightConstraint(adjustedHeight)
+                }
             }
             .store(in: &subscriptions)
     }

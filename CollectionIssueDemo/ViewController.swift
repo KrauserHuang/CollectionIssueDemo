@@ -13,7 +13,9 @@ class ViewController: UIViewController {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
     }
-
-
+    
+    @IBAction func openCollectionView(_ sender: UIButton) {
+        print("我進來了")
+    }
 }
 

@@ -15,7 +15,10 @@ class ViewController: UIViewController {
     }
     
     @IBAction func openCollectionView(_ sender: UIButton) {
-        print("我進來了")
+        let vc = CollectionViewEmbeddedViewController()
+        vc.modalPresentationStyle = .fullScreen
+        vc.modalTransitionStyle = .crossDissolve
+        present(vc, animated: true)
     }
 }
 

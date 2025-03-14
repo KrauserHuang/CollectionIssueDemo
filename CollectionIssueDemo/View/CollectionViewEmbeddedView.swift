@@ -38,6 +38,8 @@ class CollectionViewEmbeddedView: UIView, CollectionViewEmbeddedFooterViewDelega
     typealias DataSource = UICollectionViewDiffableDataSource<Section, Movie>
     typealias Snapshot = NSDiffableDataSourceSnapshot<Section, Movie>
     private lazy var dataSource = makeDataSource()
+    
+    private let movieManager = MovieManager.shared
     private var subscriptions: Set<AnyCancellable> = []
     weak var delegate: CollectionViewEmbeddedViewDelegate?
     @Published private(set) var height: CGFloat = 0
@@ -63,16 +65,6 @@ class CollectionViewEmbeddedView: UIView, CollectionViewEmbeddedFooterViewDelega
         
         setupUI()
         
-        Task {
-            do {
-                let movies = try await fetchMoviesFromAPI()
-                self.movies = movies
-            } catch {
-                print(error)
-            }
-        }
-        
-//        updateSnapshot(animated: true)
         setupBindings()
     }
     
@@ -94,25 +86,12 @@ class CollectionViewEmbeddedView: UIView, CollectionViewEmbeddedFooterViewDelega
         ])
     }
     
-    private func fetchMoviesFromAPI() async throws -> [Movie] {
-        let url = URL(string: "https://api.themoviedb.org/3/movie/upcoming?api_key=\(apiKey)")!
-        
-        let (data, response) = try await URLSession.shared.data(from: url)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            return []
-        }
-        
-        do {
-            let decoded = try JSONDecoder().decode(MovieResponse.self, from: data)
-            return decoded.results
-        } catch {
-            return []
-        }
-    }
-    
     private func setupBindings() {
+        movieManager.$movies
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.movies, on: self)
+            .store(in: &subscriptions)
+        
         collectionView.publisher(for: \.contentSize)
             .map(\.height)
             .removeDuplicates()
